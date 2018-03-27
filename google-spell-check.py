@@ -3,7 +3,8 @@
 # miscellaneous jon sculzi bookz
 
 import sublime, sublime_plugin, urllib.request, urllib.parse, re, html.parser
-
+from bs4 import BeautifulSoup
+import requests
 class GoogleSpellCheckCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		if len(self.view.sel()) == 1 and self.view.sel()[0].a == self.view.sel()[0].b:
@@ -16,26 +17,41 @@ class GoogleSpellCheckCommand(sublime_plugin.TextCommand):
 			fix = self.correct(self.view.substr(sel))
 			self.view.replace(edit, sel, fix)
 			self.view.end_edit(edit)
+	
 
 	def correct(self, text):
 		# grab html
-		html_result = self.get_page('http://www.google.com/search?hl=en&q=' + urllib.parse.quote(text))
-		html_parser = html.parser.HTMLParser()
-
-		# save html for debugging
-		# open('page.html', 'w').write(html)
-
-		# pull pieces out
-		match = re.search(r'(?:Showing results for|Did you mean|Including results for)[^\0]*?<a.*?><b.*?><i.*?>(.*?)</i>', html_result)
-		if match is None:
-			fix = text
-		else:
-			fix = match.group(1)
-			fix = re.sub(r'<.*?>', '', fix)
-			fix = html_parser.unescape(fix)
-
-		# return result
+		r  = requests.get('http://www.google.com/search?hl=en&q=' + urllib.parse.quote(text))
+		data = r.text
+		soup = BeautifulSoup(data, "html.parser")
+		fix = None
+		try:
+			fix = soup.find("a", {"class": "spell"}).getText()
+		except:
+			fix = soup.find("div", {"id": "MCN7mf"})
+			fix = fix.find("b")
+			fix = fix.find("i").getText()
 		return fix
+
+	# def correct(self, text):
+	# 	# grab html
+	# 	html_result = self.get_page('http://www.google.com/search?hl=en&q=' + urllib.parse.quote(text))
+	# 	html_parser = html.parser.HTMLParser()
+
+	# 	# save html for debugging
+	# 	# open('page.html', 'w').write(html)
+
+	# 	# pull pieces out
+	# 	match = re.search(r'(?:Showing results for|Did you mean|Including results for)[^\0]*?<a.*?><b.*?><i.*?>(.*?)</i>', html_result)
+	# 	if match is None:
+	# 		fix = text
+	# 	else:
+	# 		fix = match.group(1)
+	# 		fix = re.sub(r'<.*?>', '', fix)
+	# 		fix = html_parser.unescape(fix)
+
+	# 	# return result
+	# 	return fix
 
 	def get_page(self, url):
 		# the type of header affects the type of response google returns
